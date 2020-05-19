@@ -43,17 +43,7 @@ class BatchOperationsMixin:
         data.pop('updated_by', None)
         data.pop('updated_by_id', None)
 
-        if count > 0:
-            first_object = queryset.first()
-
         queryset.all().update(**data)
-
-        if count > 0:
-            for sublist in generate_payloads(affected_ids):
-                first_object.notify('batch_updated', {
-                    'ids': sublist,
-                    'total': count,
-                })
 
         return Http200({
             'count': count,
@@ -77,17 +67,7 @@ class BatchOperationsMixin:
 
         affected_ids = [item.id for item in queryset]
 
-        if count > 0:
-            first_object = queryset.first()
-
         queryset.all().delete()
-
-        if count > 0:
-            for sublist in generate_payloads(affected_ids):
-                first_object.notify('batch_deleted', {
-                    'ids': sublist,
-                    'total': count,
-                })
 
         return {
             'count': count,

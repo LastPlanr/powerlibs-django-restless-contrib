@@ -1,3 +1,4 @@
+import ast
 from django.core.exceptions import FieldError
 from django.core.validators import ValidationError
 from django.db.models import Q
@@ -91,6 +92,8 @@ class FilteredEndpointMixin:
                 value = True
             elif value == 'False':
                 value = False
+            elif isinstance(value, str) and value.strip().startswith('['):
+                value = ast.literal_eval(value.strip())
 
             args_list[key] = value
 
