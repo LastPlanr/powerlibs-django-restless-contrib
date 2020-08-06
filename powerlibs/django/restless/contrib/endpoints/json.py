@@ -59,7 +59,7 @@ class JSONFieldListEndpointMixin(JSONFieldsEndpoint):
             for field_name, field_type in fields_data:
                 value = obj[field_name]
                 if value:
-                    if isinstance(value, dict):
+                    if isinstance(value, (list, tuple, dict)):
                         obj[field_name] = value
                     else:
                         # DjangoRestless makes a str(dict), so we can safely use a `eval`, here:
