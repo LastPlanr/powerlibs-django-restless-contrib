@@ -5,11 +5,12 @@ try:
 except ImportError:
     from distutils.core import setup
 
-version = '0.30.1'
+version = '0.30.2'
 
 
 def pip_git_to_setuptools_git(url):
-    match = re.match(r'git\+https://github.com/(?P<organization>[^/]+)/(?P<repository>[^/]+).git@(?P<tag>.+)', url.strip())
+    match = re.match(
+        r'git\+https://github.com/(?P<organization>[^/]+)/(?P<repository>[^/]+).git@(?P<tag>.+)', url.strip())
     if match:
         url = 'http://github.com/{organization}/{repository}/tarball/master#egg={tag}'.format(
             **match.groupdict()
