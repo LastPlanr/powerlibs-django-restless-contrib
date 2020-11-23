@@ -74,7 +74,8 @@ class FilteredEndpointMixin:
             args_list = filter_args
 
             try:
-                potential_operator = key.split('__')[1]
+                splitRes = key.split('__')
+                potential_operator = splitRes[-1]
             except IndexError:
                 pass
             else:
