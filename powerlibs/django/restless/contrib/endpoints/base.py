@@ -10,25 +10,35 @@ class PaginatedEndpointMixin:
     def get(self, request, *args, **kwargs):
         limit = request.GET.get('_limit', None)
         offset = int(request.GET.get('_offset', 0))
-
         qs = self.get_query_set(request, *args, **kwargs)
-        total = qs.count()
 
-        begin = offset
-        if limit is None:
-            end = None
+        if limit is None and offset == 0:
+            serialized_results = self.serialize(qs)
+            total = len(serialized_results)
+
+            return {
+                'total': total,
+                'count': total,
+                'results': serialized_results,
+            }
         else:
-            end = begin + int(limit)
-        paginated_qs = qs[begin:end]
+            total = qs.count()
 
-        count = paginated_qs.count()
-        serialized_results = self.serialize(paginated_qs)
+            begin = offset
+            if limit is None:
+                end = None
+            else:
+                end = begin + int(limit)
+            paginated_qs = qs[begin:end]
 
-        return {
-            'total': total,
-            'count': count,
-            'results': serialized_results,
-        }
+            count = paginated_qs.count()
+            serialized_results = self.serialize(paginated_qs)
+
+            return {
+                'total': total,
+                'count': count,
+                'results': serialized_results,
+            }
 
 
 class OrderedEndpointMixin:

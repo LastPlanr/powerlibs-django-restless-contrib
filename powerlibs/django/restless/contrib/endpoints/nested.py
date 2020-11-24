@@ -1,6 +1,8 @@
 from cached_property import cached_property
-
 from powerlibs.django.restless.models import serialize_model
+from powerlibs.django.restless.http import Http400, HttpError
+from django.core.exceptions import FieldError
+from django.db.models import F
 
 
 class NestedEntitiesMixin:
@@ -39,7 +41,8 @@ class NestedEntitiesDetailEndpointMixin(NestedEntitiesMixin):
                     entity = getattr(instance, entity_name)
 
                     if entity:
-                        serialized_entity = serialize_model(entity, exclude=self.get_hidden_fields(entity._meta.model))
+                        serialized_entity = serialize_model(
+                            entity, exclude=self.get_hidden_fields(entity._meta.model))
                     else:
                         serialized_entity = None
 
@@ -52,58 +55,40 @@ class NestedEntitiesDetailEndpointMixin(NestedEntitiesMixin):
                     the_list = related_entities[entity_name] = []
 
                     for entity in field.all():
-                        the_list.append(serialize_model(entity, exclude=self.get_hidden_fields(entity._meta.model)))
+                        the_list.append(serialize_model(
+                            entity, exclude=self.get_hidden_fields(entity._meta.model)))
 
         return serialized_data
 
 
 class NestedEntitiesListEndpointMixin(NestedEntitiesMixin):
-    def get(self, request, *args, **kwargs):
-        results = super().get(request, *args, **kwargs)
+    def get_query_set(self, request, *args, **kwargs):
+        queryset = super().get_query_set(request, *args, **kwargs)
 
         nesting_request = request.GET.get('_nested', None)
-        if not nesting_request:
-            return results
+        if nesting_request:
+            for entity in nesting_request.split(','):
+                split = entity.split('@')
+                entity_name = split[0]
+                entity_fields = []
 
-        is_paginated = isinstance(results, dict) and 'results' in results
+                try:
+                    entity_fields = split[1].split('|')
+                except IndexError:
+                    raise HttpError(
+                        400, "User '@' to specify {} fields, split multiple fields using '|'".format(entity_name))
 
-        if is_paginated:
-            items = results['results']
-        else:
-            items = results
+                try:
+                    queryset = queryset.select_related(entity_name)
+                except FieldError as ex:
+                    raise HttpError(400, "FieldError: {}".format(ex))
 
-        for item in items:
-            item['_related'] = related_entities = {}
+                annotated_queryset = queryset
+                for field in entity_fields:
+                    fullField = f"{entity_name}__{field}"
+                    annotated_queryset = annotated_queryset.annotate(
+                        **{fullField: F(fullField)})
 
-            for entity_name in nesting_request.split(','):
+                return annotated_queryset
 
-                if entity_name in self.foreign_keys:
-                    field = getattr(self.model, entity_name)
-
-                    alt_name = f'{entity_name}_id'
-                    if alt_name in item:
-                        entity_id = item[alt_name]
-                    else:
-                        entity_id = item[entity_name]
-
-                    if not entity_id:
-                        related_entities[entity_name] = None
-                        continue
-
-                    entity = field.get_queryset().get(id=entity_id)
-                    serialized_entity = serialize_model(entity, exclude=self.get_hidden_fields(entity._meta.model))
-                    related_entities[entity_name] = serialized_entity
-                    continue
-
-                field = getattr(self.model, entity_name, None)
-
-                if field and field.__class__.__name__ == 'ManyToManyDescriptor':
-                    the_list = related_entities[entity_name] = []
-
-                    item_entity = self.model.objects.filter(id=item['id']).prefetch_related(entity_name)[0]
-                    manager = getattr(item_entity, entity_name)
-
-                    for entity in manager.all():
-                        the_list.append(serialize_model(entity, exclude=self.get_hidden_fields(entity._meta.model)))
-
-        return results
+        return queryset.values()
